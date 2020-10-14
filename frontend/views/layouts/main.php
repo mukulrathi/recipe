@@ -1,10 +1,12 @@
 <?php
 
 /* @var $this \yii\web\View */
+
 /* @var $content string */
 
 use yii\helpers\Html;
-
+use frontend\assets\AppAsset;
+AppAsset::register($this);
 use yii\widgets\Breadcrumbs;
 use common\widgets\Alert;
 
@@ -20,20 +22,19 @@ use common\widgets\Alert;
     <title>Recipe</title>
     <?php $this->head() ?>
 </head>
-<body>
+<body class="right-column-fixed">
 <?php $this->beginBody() ?>
-<?= $this->render('header')?>
-<div class="wrap">
-   
-    <div class="container">
-        <?= Breadcrumbs::widget([
-            'links' => isset($this->params['breadcrumbs']) ? $this->params['breadcrumbs'] : [],
-        ]) ?>
-        <?= $content ?>
+<div id="loading">
+    <div id="loading-center">
     </div>
 </div>
-<?= $this->render('modal')?>
-<?= $this->render('footer')?>
+<div class="wrapper">
+    <?= $this->render('header') ?>
+    <?= $content ?>
+    <?= $this->render('modal') ?>
+    <?= $this->render('footer') ?>
+    
+</div>
 
 <?php $this->endBody() ?>
 </body>
