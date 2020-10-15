@@ -17,7 +17,7 @@ if(!file_exists($session_path)) {
 
 return [
     'id' => 'app-frontend',
-    'name' => 'Jumbo Garage',
+    'name' => 'Recipe Byte',
     'language' => 'en',
     'basePath' => dirname(__DIR__),
     'bootstrap' => ['applicationSetting'],

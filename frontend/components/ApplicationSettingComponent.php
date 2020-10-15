@@ -21,6 +21,6 @@ class ApplicationSettingComponent implements BootstrapInterface
      */
     public function bootstrap($app)
     {
-        $app->name = 'Radical IIT';
+        $app->name = 'Recipe Byte';
     }
 }
