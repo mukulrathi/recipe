@@ -78,7 +78,7 @@ return [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
             'rules' => [
-                '/' => 'site/index',
+                '/' => 'site/login',
                 'content/<slug:[a-z0-9-]+>' => 'pages/default/view',
                 'robots.txt' => 'site/robots',
             ],

@@ -48,7 +48,7 @@ class User extends UserModel
     public function search($params)
     {
         $query = User::find();
-        $query->joinWith(['userProfile', 'userShopAddress'], true, 'left JOIN');
+        $query->joinWith(['userProfile'], true, 'left JOIN');
         $query->leftJoin('auth_assignment', '`auth_assignment`.`user_id` = `user`.`id`');
 
         // add conditions that should always apply here

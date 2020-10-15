@@ -1,4 +1,5 @@
 <?php
+
 namespace frontend\controllers;
 
 use backend\modules\user\models\User;
@@ -56,6 +57,7 @@ class SiteController extends BaseController
         return [
             'error' => [
                 'class' => 'yii\web\ErrorAction',
+                'layout' => 'main-custom',
             ],
             'captcha' => [
                 'class' => 'yii\captcha\CaptchaAction',
@@ -102,10 +104,9 @@ class SiteController extends BaseController
                 return $this->asJson([
                     'flag' => true,
                     'message' => 'Login Successfully',
-                    'url' => Url::to(['dashboard'], true)
+                    'url' => Url::to(['/post/index'], true)
                 ]);
-            }
-            else {
+            } else {
 
                 return $this->asJson([
                     'flag' => false,
@@ -185,49 +186,61 @@ class SiteController extends BaseController
      */
     public function actionSignup()
     {
-        $this->layout ='main-custom';
+        $this->layout = 'main-custom';
         $model = new SignupForm();
         if ($model->load(Yii::$app->request->post())) {
-            if($model->validate()) {
+            if ($model->validate()) {
                 $transaction = \Yii::$app->db->beginTransaction();
                 try {
-                    if($user = $model->signup()) {
+                    if ($user = $model->signup()) {
                         $backendUser = User::findOne($user->id);
                         $this->assignRole($user, 'user');
                         $this->saveProfile($user, $model);
                         $this->saveAddress($user, $model);
                         $this->saveNotification($user);
                         $userVerification = $this->saveUserVerification($user);
-                        Yii::$app->emailtemplates->sendMail([
-                            $backendUser->email => $backendUser->userProfile->getName()
-                        ], 'email-verification', [
-                            'full_name' => $backendUser->userProfile->getName(),
-                            'link' => Url::to(['/site/email-verification', 'token' => $userVerification->token], true)
-                        ]);
-
                         $transaction->commit();
-
-                        Yii::$app->growl->setFlash([
-                            'type' => 'success',
-                            'message' => 'Your account has been created successfully. Check your email for further instructions.'
+                        Yii::$app
+                            ->mailer
+                            ->compose(
+                                ['html' => 'verification-html', 'text' => 'verification-text'],
+                                ['user' => $user->username, 'link' => Url::to(['/site/email-verification', 'token' => $userVerification->token], true)]
+                            )
+                            ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name . ' robot'])
+                            ->setTo($user->email)
+                            ->setSubject('Password reset for ' . Yii::$app->name)
+                            ->send();
+                        return $this->asJson([
+                            'flag' => true,
+                            'message' => 'Please verify your account via your email. You will only be able to sign in after verifying your email',
+                            'url' => Url::to(['login'], true)
                         ]);
 
-                        return $this->redirect(['login']);
 
                     } else {
 
-                        Yii::$app->growl->setFlash([
-                            'type' => 'info',
-                            'message' => 'Unable to create your account.'
+                        return $this->asJson([
+                            'flag' => false,
+                            'type' => 'client',
+                            'message' => 'Unable to create your account.',
                         ]);
                     }
                 } catch (\Exception $exception) {
+                     pr($exception->getMessage());
                     $transaction->rollBack();
-                    Yii::$app->growl->setFlash([
-                        'type' => 'info',
-                        'message' => 'An error occurred while processing your request. Please try again.'
+                    return $this->asJson([
+                        'flag' => false,
+                        'type' => 'client',
+                        'message' => 'An error occurred while processing your request. Please try again.',
                     ]);
                 }
+            } else {
+                return $this->asJson([
+                    'flag' => false,
+                    'type' => 'error',
+                    'formName' => strtolower($model->formName()),
+                    'message' => $model->errors,
+                ]);
             }
         }
 
@@ -236,9 +249,67 @@ class SiteController extends BaseController
         ]);
     }
 
+    protected function assignRole($user, $role_name)
+    {
+        $manager = Yii::$app->authManager;
+        $role = $manager->getRole($role_name);
+        $role = $role ?: $manager->getPermission($role_name);
+        $manager->assign($role, $user->id);
+    }
+
+    protected function saveProfile($user, $model)
+    {
+        $modelProfile = new UserProfile();
+        $modelProfile->user_id = $user->id;
+        $modelProfile->first_name = isset($model->first_name) ? $model->first_name : null;
+        $modelProfile->last_name = isset($model->last_name) ? $model->last_name : null;
+
+        if ($modelProfile->save(false)) {
+            return true;
+        }
+        throw new HttpException(405, 'Error saving model modelProfile');
+    }
+
+    protected function saveAddress($user, $model)
+    {
+        $modelAddress = new UserAddress();
+        $modelAddress->user_id = $user->id;
+        if (isset($model->zip_code)) {
+            $modelAddress->postal_code = $model->zip_code;
+        }
+
+        if ($modelAddress->save(false)) {
+            return true;
+        }
+        throw new HttpException(405, 'Error saving model modelAddress');
+    }
+
+    public function saveNotification($user)
+    {
+        $modelNotification = new UserNotification();
+        $modelNotification->user_id = $user->id;
+
+        if ($modelNotification->save(false)) {
+            return true;
+        }
+        throw new HttpException(405, 'Error saving model modelNotification');
+    }
+
+    public function saveUserVerification($user)
+    {
+        $modelUserVerification = new UserVerification();
+        $modelUserVerification->user_id = $user->id;
+        $modelUserVerification->token = $modelUserVerification->generateUniqueRandomString('token');
+        $modelUserVerification->request_time = date('Y-m-d H:i:s');
+        if ($modelUserVerification->save(false)) {
+            return $modelUserVerification;
+        }
+        throw new HttpException(405, 'Error saving model modelUserVerification');
+    }
+
     public function actionUpdateProfile()
     {
-        /** @var $user User*/
+        /** @var $user User */
         $user = Yii::$app->user->identity;
 
         $model = $this->loadUpdateProfile($user);
@@ -247,7 +318,7 @@ class SiteController extends BaseController
 
             $model->avatar = UploadedFile::getInstance($model, 'avatar');
 
-            if($model->validate()) {
+            if ($model->validate()) {
 
             }
         }
@@ -256,6 +327,27 @@ class SiteController extends BaseController
             'user' => $user,
             'model' => $model
         ]);
+    }
+
+    protected function loadUpdateProfile(User $user)
+    {
+        $model = new UpdateProfileForm();
+        $model->username = $user->username;
+        $model->emailAddress = $user->email;
+        $model->firstName = $user->userProfile->first_name;
+        $model->lastName = $user->userProfile->last_name;
+        $model->about = $user->userProfile->about;
+        $model->mobile = $user->userProfile->mobile;
+        $model->gender = $user->userProfile->gender;
+        $model->address = $user->userAddress->address_line;
+        $model->city = $user->userAddress->city;
+        $model->state = $user->userAddress->state;
+        $model->country = $user->userAddress->country;
+        $model->latitude = $user->userAddress->latitude;
+        $model->longitude = $user->userAddress->longitude;
+        $model->postalCode = $user->userAddress->postal_code;
+
+        return $model;
     }
 
     /**
@@ -317,23 +409,35 @@ class SiteController extends BaseController
 
     public function actionChangePassword()
     {
-        if(Yii::$app->getUser()->getIsGuest()) {
+        if (Yii::$app->getUser()->getIsGuest()) {
             return $this->redirect('/site/login');
         }
-        /** @var $user User*/
+        /** @var $user User */
         $user = Yii::$app->user->identity;
         $model = new ChangePasswordForm();
 
-        if($model->load(Yii::$app->request->post()) && $model->validate()) {
-            $user->setPassword($_POST['ChangePasswordForm']['new_password']);
-            $user->update();
-            Yii::$app->growl->setFlash([
-                'type' => 'success',
-                'message' => 'Your password has been changed successfully.'
-            ]);
-            return $this->redirect(['/site/dashboard']);
-        }
+        if ($model->load(Yii::$app->request->post())) {
+            if ($model->validate()) {
+                $user->setPassword($_POST['ChangePasswordForm']['new_password']);
+                $user->update();
+                Yii::$app->growl->setFlash([
+                    'type' => 'success',
+                    'message' => 'Your password has been changed successfully.'
+                ]);
+                return $this->asJson([
+                    'flag' => true,
+                    'message' => 'Your password has been changed successfully',
+                ]);
+            } else {
+                return $this->asJson([
+                    'flag' => false,
+                    'type' => 'error',
+                    'formName' => strtolower($model->formName()),
+                    'message' => $model->errors,
+                ]);
+            }
 
+        }
         return $this->render('change-password', [
             'model' => $model
         ]);
@@ -345,7 +449,8 @@ class SiteController extends BaseController
      * @param $token
      * @return string|Response
      */
-    public function actionEmailVerification($token)
+    public
+    function actionEmailVerification($token)
     {
         $userVerification = $this->findUserVerificationByTokenModel($token);
 
@@ -385,7 +490,25 @@ class SiteController extends BaseController
         }
     }
 
-    public function actionLinkSocialAccounts()
+    /**
+     * Finds the Category model based on its primary key value.
+     * If the model is not found, a 404 HTTP exception will be thrown.
+     * @param string $token
+     * @return bool | UserVerification the loaded model
+     * @throws NotFoundHttpException if the model cannot be found
+     */
+    public
+    function findUserVerificationByTokenModel($token)
+    {
+        if (($model = UserVerification::findOne(['token' => $token])) !== null) {
+            return $model;
+        } else {
+            return false;
+        }
+    }
+
+    public
+    function actionLinkSocialAccounts()
     {
         /** @var $user User */
         $user = Yii::$app->user->identity;
@@ -398,13 +521,14 @@ class SiteController extends BaseController
      *
      * @return \yii\web\Response
      */
-    public function actionResendVerificationToken()
+    public
+    function actionResendVerificationToken()
     {
-        /** @var $user \backend\modules\user\models\User*/
+        /** @var $user \backend\modules\user\models\User */
         $user = Yii::$app->user->identity;
 
         $modelUserVerification = new UserVerification();
-        if(!$user->userVerification) {
+        if (!$user->userVerification) {
             $modelUserVerification->token = $modelUserVerification->generateUniqueRandomString('token');
             $modelUserVerification->request_time = date('Y-m-d H:i:s');
             $modelUserVerification->save(false);
@@ -433,9 +557,10 @@ class SiteController extends BaseController
         return $this->redirect(['dashboard']);
     }
 
-    public function actionSubmitForApproval()
+    public
+    function actionSubmitForApproval()
     {
-        /** @var $model User*/
+        /** @var $model User */
         $model = Yii::$app->user->identity;
 
         $modelApproval = new UserProfileApproval();
@@ -468,9 +593,10 @@ class SiteController extends BaseController
      * This action should respond to 'robots.txt' request.
      * It will create its content "on the fly", taking in account current environment.
      */
-    public function actionRobots()
+    public
+    function actionRobots()
     {
-        if(!Yii::$app->settings->get('SiteConfiguration', 'enableRobots'))
+        if (!Yii::$app->settings->get('SiteConfiguration', 'enableRobots'))
             return;
         $disallow = YII_ENV_PROD ? '' : "\nDisallow: /";
         $siteMapUrl = Yii::$app->urlManager->getHostInfo() . Yii::$app->urlManager->getBaseUrl() . '/sitemap/sitemap.xml';
@@ -483,100 +609,5 @@ ROBOTS;
         $response->getHeaders()->add('Content-Type', 'text/plain; charset=UTF-8');
         $response->content = $content;
         return $response;
-    }
-
-    protected function loadUpdateProfile(User $user)
-    {
-        $model = new UpdateProfileForm();
-        $model->username = $user->username;
-        $model->emailAddress = $user->email;
-        $model->firstName = $user->userProfile->first_name;
-        $model->lastName = $user->userProfile->last_name;
-        $model->about = $user->userProfile->about;
-        $model->mobile = $user->userProfile->mobile;
-        $model->gender = $user->userProfile->gender;
-        $model->address = $user->userAddress->address_line;
-        $model->city = $user->userAddress->city;
-        $model->state = $user->userAddress->state;
-        $model->country = $user->userAddress->country;
-        $model->latitude = $user->userAddress->latitude;
-        $model->longitude = $user->userAddress->longitude;
-        $model->postalCode = $user->userAddress->postal_code;
-
-        return $model;
-    }
-
-    protected function assignRole($user, $role_name)
-    {
-        $manager = Yii::$app->authManager;
-        $role = $manager->getRole($role_name);
-        $role = $role ?: $manager->getPermission($role_name);
-        $manager->assign($role, $user->id);
-    }
-
-    protected function saveProfile($user, $model)
-    {
-        $modelProfile = new UserProfile();
-        $modelProfile->user_id = $user->id;
-        $modelProfile->first_name = isset($model->first_name) ? $model->first_name : null;
-        $modelProfile->last_name = isset($model->last_name) ? $model->last_name : null;
-
-        if($modelProfile->save(false)) {
-            return true;
-        }
-        throw new HttpException( 405, 'Error saving model modelProfile' );
-    }
-
-    protected function saveAddress($user, $model)
-    {
-        $modelAddress = new UserAddress();
-        $modelAddress->user_id = $user->id;
-        if(isset($model->zip_code)) {
-            $modelAddress->postal_code = $model->zip_code;
-        }
-
-        if($modelAddress->save(false)) {
-            return true;
-        }
-        throw new HttpException( 405, 'Error saving model modelAddress' );
-    }
-
-    public function saveNotification($user)
-    {
-        $modelNotification = new UserNotification();
-        $modelNotification->user_id = $user->id;
-
-        if($modelNotification->save(false)) {
-            return true;
-        }
-        throw new HttpException( 405, 'Error saving model modelNotification' );
-    }
-
-    public function saveUserVerification($user)
-    {
-        $modelUserVerification = new UserVerification();
-        $modelUserVerification->user_id = $user->id;
-        $modelUserVerification->token = $modelUserVerification->generateUniqueRandomString('token');
-        $modelUserVerification->request_time = date('Y-m-d H:i:s');
-        if($modelUserVerification->save(false)) {
-            return $modelUserVerification;
-        }
-        throw new HttpException( 405, 'Error saving model modelUserVerification' );
-    }
-
-    /**
-     * Finds the Category model based on its primary key value.
-     * If the model is not found, a 404 HTTP exception will be thrown.
-     * @param string $token
-     * @return bool | UserVerification the loaded model
-     * @throws NotFoundHttpException if the model cannot be found
-     */
-    public function findUserVerificationByTokenModel($token)
-    {
-        if(($model = UserVerification::findOne(['token' => $token])) !== null) {
-            return $model;
-        } else {
-            return false;
-        }
     }
 }
