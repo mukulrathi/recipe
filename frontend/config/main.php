@@ -7,11 +7,12 @@ $params = array_merge(
 );
 
 use \yii\web\Request;
+
 $baseUrl = str_replace('/frontend/web', '', (new Request)->getBaseUrl());
 
 $session_path = __DIR__ . '/../runtime/tmp';
 
-if(!file_exists($session_path)) {
+if (!file_exists($session_path)) {
     mkdir($session_path, 0777, true);
 }
 
@@ -23,7 +24,7 @@ return [
     'bootstrap' => ['applicationSetting'],
     'controllerNamespace' => 'frontend\controllers',
     'modules' => [
-        
+
     ],
     'components' => [
 
@@ -49,31 +50,35 @@ return [
             'savePath' => $session_path,
         ],
 
+        'growl' => [
+            'class' => \frontend\components\Alert::className()
+        ],
+
         'errorHandler' => [
             'errorAction' => 'site/error',
         ],
-           'assetManager' => [
+        'assetManager' => [
             'appendTimestamp' => false,
             'bundles' => [
                 'yii\bootstrap\BootstrapAsset' => [
                     'sourcePath' => null,
                     'baseUrl' => 'https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.2.1/css/bootstrap.min.css',
-                   'css' => ['/css/bootstrap.min.css'],
-                  //   'js'=>['//maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js']
+                    'css' => ['/css/bootstrap.min.css'],
+                    //   'js'=>['//maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js']
 
                 ],
                 'yii\bootstrap\BootstrapPluginAsset' => [
                     'sourcePath' => null,
                     'baseUrl' => 'https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.2.1/js/bootstrap.min.js',
-                      'js' => ['/js/bootstrap.min.js'],
-                
-            
+                    'js' => ['/js/bootstrap.min.js'],
+
+
                 ],
 
-            
+
             ],
         ],
-        
+
         'urlManager' => [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
@@ -86,7 +91,7 @@ return [
         'applicationSetting' => [
             'class' => 'frontend\components\ApplicationSettingComponent'
         ]
-        
+
     ],
 
     'params' => $params,
