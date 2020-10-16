@@ -69,7 +69,7 @@ $this->params['breadcrumbs'][] = $this->title;
                     <?= $form->field($model, 'username')->textInput(['autofocus' => true]) ?>
 
                     <div class="form-group">
-                        <a href="#" class="float-right">Forgot password?</a>
+                        <a href="<?=\yii\helpers\Url::to(['site/request-password-reset'],true) ?>" class="float-right">Forgot password?</a>
                         <?= $form->field($model, 'password')->PasswordInput() ?>
 
                     </div>

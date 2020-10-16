@@ -227,7 +227,7 @@ class SiteController extends BaseController
                         ]);
                     }
                 } catch (\Exception $exception) {
-                     pr($exception->getMessage());
+                    pr($exception->getMessage());
                     $transaction->rollBack();
                     return $this->asJson([
                         'flag' => false,
@@ -358,18 +358,28 @@ class SiteController extends BaseController
      */
     public function actionRequestPasswordReset()
     {
+        $this->layout = 'main-custom';
         $model = new PasswordResetRequestForm();
-        if ($model->load(Yii::$app->request->post()) && $model->validate()) {
-            if ($model->sendEmail()) {
-                Yii::$app->growl->setFlash([
-                    'type' => 'success',
-                    'message' => 'Check your email for further instructions.'
-                ]);
-                return $this->goHome();
+        if ($model->load(Yii::$app->request->post())) {
+
+            if ($model->validate()) {
+                if ($model->sendEmail()) {
+                    return $this->asJson([
+                        'flag' => true,
+                        'message' => 'Check your email for further instructions',
+                    ]);
+                } else {
+                    return $this->asJson([
+                        'flag' => false,
+                        'message' => 'Sorry, we are unable to reset password for the provided email address.',
+                    ]);
+                }
             } else {
-                Yii::$app->growl->setFlash([
+                return $this->asJson([
+                    'flag' => false,
                     'type' => 'error',
-                    'message' => 'Sorry, we are unable to reset password for the provided email address.'
+                    'formName' => strtolower($model->formName()),
+                    'message' => $model->errors,
                 ]);
             }
         }
@@ -386,27 +396,39 @@ class SiteController extends BaseController
      * @return mixed
      * @throws BadRequestHttpException
      */
-    public function actionResetPassword($token)
+    function actionResetPassword($token)
     {
+
+        $this->layout = 'main-custom';
         try {
             $model = new ResetPasswordForm($token);
         } catch (InvalidParamException $e) {
+            // pr($e->getMessage());
             throw new BadRequestHttpException($e->getMessage());
         }
-
-        if ($model->load(Yii::$app->request->post()) && $model->validate() && $model->resetPassword()) {
-            Yii::$app->growl->setFlash([
-                'type' => 'success',
-                'message' => 'New password saved.'
-            ]);
-
-            return $this->goHome();
+        if ($model->load(Yii::$app->request->post())) {
+            if ($model->validate() && $model->resetPassword()) {
+                return $this->asJson([
+                    'flag' => true,
+                    'message' => 'New password saved.',
+                    'url' => Url::to(['login'])
+                ]);
+            } else {
+                return $this->asJson([
+                    'flag' => false,
+                    'type' => 'error',
+                    'formName' => strtolower($model->formName()),
+                    'message' => $model->errors,
+                ]);
+            }
         }
+
 
         return $this->render('resetPassword', [
             'model' => $model,
         ]);
     }
+
 
     public function actionChangePassword()
     {
@@ -467,8 +489,10 @@ class SiteController extends BaseController
                     'message' => 'Your account has been verified successfully.'
                 ]);
 
+
                 return $this->redirect(['dashboard']);
             } else {
+
 
                 Yii::$app->growl->setFlash([
                     'type' => 'info',
