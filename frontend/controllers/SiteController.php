@@ -461,12 +461,6 @@ class SiteController extends BaseController
                 $userVerification->responded = 1;
                 $userVerification->update();
 
-                if (Yii::$app->settings->get('SiteConfiguration', 'loginAfterEmailVerification', false)) {
-                    /** @var $user User */
-                    $user = $userVerification->user;
-                    Yii::$app->user->loginByAccessToken($user->auth_key);
-                }
-
                 Yii::$app->growl->setFlash([
                     'type' => 'success',
                     'message' => 'Your account has been verified successfully.'
