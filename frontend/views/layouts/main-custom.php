@@ -24,6 +24,7 @@ use common\widgets\Alert;
 </head>
 <body>
 <?php $this->beginBody() ?>
+<?= \frontend\components\GrowlAlertWidget::widget() ?>
 <?= $content ?>
 <?= $this->render('modal')?>
 

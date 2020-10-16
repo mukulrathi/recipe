@@ -30,6 +30,7 @@ use common\widgets\Alert;
 </div>
 <div class="wrapper">
     <?= $this->render('header') ?>
+    <?= \frontend\components\GrowlAlertWidget::widget() ?>
     <?= $content ?>
     <?= $this->render('modal') ?>
     <?= $this->render('footer') ?>
